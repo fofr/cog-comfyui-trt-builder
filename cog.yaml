@@ -27,6 +27,9 @@ build:
     - tensorrt-cu12_bindings>=10.1.0
     - tensorrt-cu12_libs>=10.1.0
 
+    # upload engine
+    - huggingface_hub
+
     # fix for pydantic issues in cog
     # https://github.com/replicate/cog/issues/1623
     - albumentations==1.4.3

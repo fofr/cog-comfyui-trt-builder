@@ -2,8 +2,9 @@ import json
 import os
 import tarfile
 from typing import List
-from cog import BasePredictor, Input, Path
+from cog import BasePredictor, Input, Path, Secret
 from comfyui import ComfyUI
+from huggingface_hub import HfApi
 
 OUTPUT_DIR = "/tmp/outputs"
 INPUT_DIR = "/tmp/inputs"
@@ -17,6 +18,14 @@ class Predictor(BasePredictor):
     def setup(self):
         self.comfyUI = ComfyUI("127.0.0.1:8188")
         self.comfyUI.start_server(OUTPUT_DIR, INPUT_DIR)
+
+        print("Server started")
+        gpu_name = (
+            os.popen("nvidia-smi --query-gpu=name --format=csv,noheader,nounits")
+            .read()
+            .strip()
+        )
+        print(f"GPU: {gpu_name}")
 
     def as_multiple_of_8(self, value):
         return value if value % 8 == 0 else value + 8 - (value % 8)
@@ -120,6 +129,14 @@ class Predictor(BasePredictor):
             le=128,
             description="The maximum context during inference",
         ),
+        huggingface_token: Secret = Input(
+            description="Optional: Your HuggingFace token",
+            default=None,
+        ),
+        huggingface_repo: str = Input(
+            description="Optional: The HuggingFace repo to upload the engine to",
+            default=None,
+        ),
     ) -> List[Path]:
         """Run a single prediction on the model"""
         self.comfyUI.cleanup(ALL_DIRECTORIES)
@@ -152,7 +169,18 @@ class Predictor(BasePredictor):
         with tarfile.open(output_tar, "w") as tar:
             for file in os.listdir(OUTPUT_DIR):
                 file_path = os.path.join(OUTPUT_DIR, file)
-                if os.path.isfile(file_path) and file.endswith('.engine'):
+                if os.path.isfile(file_path) and file.endswith(".engine"):
                     tar.add(file_path, arcname=file)
+
+        # Backup method - upload files to HuggingFace
+        if huggingface_token and huggingface_repo:
+            api = HfApi()
+            api.upload_folder(
+                repo_id=huggingface_repo,
+                path_in_repo="output.tar",
+                path_or_fileobj=output_tar,
+                repo_type="model",
+                use_auth_token=huggingface_token.get_secret_value(),
+            )
 
         return [Path(output_tar)]
