@@ -175,7 +175,7 @@ class Predictor(BasePredictor):
         # Backup method - upload files to HuggingFace
         if huggingface_token and huggingface_repo:
             api = HfApi()
-            api.upload_folder(
+            api.upload_file(
                 repo_id=huggingface_repo,
                 path_in_repo="output.tar",
                 path_or_fileobj=output_tar,
