@@ -24,6 +24,7 @@ class Predictor(BasePredictor):
     def update_workflow(self, workflow, **kwargs):
         checkpoint_loader = workflow["1"]["inputs"]
         checkpoint_loader["ckpt_name"] = kwargs["checkpoint"]
+
         checkpoint_filename = os.path.splitext(kwargs["checkpoint"])[0]
 
         builder = workflow["3"]["inputs"]
@@ -40,7 +41,6 @@ class Predictor(BasePredictor):
         builder["context_min"] = kwargs["context_min"]
         builder["context_opt"] = kwargs["context_opt"]
         builder["context_max"] = kwargs["context_max"]
-        builder["filename_prefix"] = kwargs["checkpoint"]
 
     def predict(
         self,
