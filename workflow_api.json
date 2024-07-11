@@ -1,0 +1,37 @@
+{
+  "1": {
+    "inputs": {
+      "ckpt_name": ""
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    }
+  },
+  "3": {
+    "inputs": {
+      "filename_prefix": "tensorrt/weights_name_DYN",
+      "batch_size_min": 1,
+      "batch_size_opt": 1,
+      "batch_size_max": 1,
+      "height_min": 512,
+      "height_opt": 1024,
+      "height_max": 1536,
+      "width_min": 512,
+      "width_opt": 1024,
+      "width_max": 1536,
+      "context_min": 1,
+      "context_opt": 1,
+      "context_max": 1,
+      "num_video_frames": 14,
+      "model": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "DYNAMIC_TRT_MODEL_CONVERSION",
+    "_meta": {
+      "title": "DYNAMIC TRT_MODEL CONVERSION"
+    }
+  }
+}

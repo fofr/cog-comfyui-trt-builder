@@ -1,111 +1,150 @@
-# An example of how to convert a given API workflow into its own Replicate model
-# Replace predict.py with this file when building your own workflow
-
-import os
-import mimetypes
 import json
-import shutil
+import os
 from typing import List
 from cog import BasePredictor, Input, Path
 from comfyui import ComfyUI
-from cog_model_helpers import optimise_images
-from cog_model_helpers import seed as seed_helper
 
 OUTPUT_DIR = "/tmp/outputs"
 INPUT_DIR = "/tmp/inputs"
 COMFYUI_TEMP_OUTPUT_DIR = "ComfyUI/temp"
 ALL_DIRECTORIES = [OUTPUT_DIR, INPUT_DIR, COMFYUI_TEMP_OUTPUT_DIR]
 
-mimetypes.add_type("image/webp", ".webp")
-
-# Save your example JSON to the same directory as predict.py
 api_json_file = "workflow_api.json"
 
-# Force HF offline
-os.environ["HF_DATASETS_OFFLINE"] = "1"
-os.environ["TRANSFORMERS_OFFLINE"] = "1"
-os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
 
 class Predictor(BasePredictor):
     def setup(self):
         self.comfyUI = ComfyUI("127.0.0.1:8188")
         self.comfyUI.start_server(OUTPUT_DIR, INPUT_DIR)
 
-        # Give a list of weights filenames to download during setup
-        with open(api_json_file, "r") as file:
-            workflow = json.loads(file.read())
-        self.comfyUI.handle_weights(
-            workflow,
-            weights_to_download=[],
-        )
-
-    def filename_with_extension(self, input_file, prefix):
-        extension = os.path.splitext(input_file.name)[1]
-        return f"{prefix}{extension}"
-
-    def handle_input_file(
-        self,
-        input_file: Path,
-        filename: str = "image.png",
-    ):
-        shutil.copy(input_file, os.path.join(INPUT_DIR, filename))
-
     # Update nodes in the JSON workflow to modify your workflow based on the given inputs
     def update_workflow(self, workflow, **kwargs):
-        # Below is an example showing how to get the node you need and update the inputs
+        checkpoint_loader = workflow["4"]["inputs"]
+        checkpoint_loader["ckpt_name"] = kwargs["checkpoint"]
 
-        # positive_prompt = workflow["6"]["inputs"]
-        # positive_prompt["text"] = kwargs["prompt"]
+        # Get checkpoint filename without extension
+        checkpoint_filename = os.path.splitext(kwargs["checkpoint"])[0]
 
-        # negative_prompt = workflow["7"]["inputs"]
-        # negative_prompt["text"] = f"nsfw, {kwargs['negative_prompt']}"
-
-        # sampler = workflow["3"]["inputs"]
-        # sampler["seed"] = kwargs["seed"]
-        pass
+        builder = workflow["3"]["inputs"]
+        builder["filename_prefix"] = f"{checkpoint_filename}_DYN"
+        builder["batch_size_min"] = kwargs["batch_size_min"]
+        builder["batch_size_opt"] = kwargs["batch_size_opt"]
+        builder["batch_size_max"] = kwargs["batch_size_max"]
+        builder["height_min"] = kwargs["height_min"]
+        builder["height_opt"] = kwargs["height_opt"]
+        builder["height_max"] = kwargs["height_max"]
+        builder["width_min"] = kwargs["width_min"]
+        builder["width_opt"] = kwargs["width_opt"]
+        builder["width_max"] = kwargs["width_max"]
+        builder["context_min"] = kwargs["context_min"]
+        builder["context_opt"] = kwargs["context_opt"]
+        builder["context_max"] = kwargs["context_max"]
+        builder["filename_prefix"] = kwargs["checkpoint"]
 
     def predict(
         self,
-        prompt: str = Input(
+        checkpoint: str = Input(
             default="",
+            description="The checkpoint to use (must be in https://github.com/fofr/cog-comfyui/blob/main/weights.json)",
         ),
-        negative_prompt: str = Input(
-            description="Things you do not want to see in your image",
-            default="",
+        batch_size_min: int = Input(
+            default=1,
+            ge=1,
+            le=100,
+            description="The minimum batch size during inference",
         ),
-        image: Path = Input(
-            description="An input image",
-            default=None,
+        batch_size_opt: int = Input(
+            default=1,
+            ge=1,
+            le=100,
+            description="The optimal batch size during inference",
         ),
-        output_format: str = optimise_images.predict_output_format(),
-        output_quality: int = optimise_images.predict_output_quality(),
-        seed: int = seed_helper.predict_seed(),
+        batch_size_max: int = Input(
+            default=1,
+            ge=1,
+            le=100,
+            description="The maximum batch size during inference",
+        ),
+        height_min: int = Input(
+            default=512,
+            ge=256,
+            le=4096,
+            description="The minimum height during inference",
+        ),
+        height_opt: int = Input(
+            default=1024,
+            ge=256,
+            le=4096,
+            description="The optimal height during inference",
+        ),
+        height_max: int = Input(
+            default=1536,
+            ge=256,
+            le=4096,
+            description="The maximum height during inference",
+        ),
+        width_min: int = Input(
+            default=512,
+            ge=256,
+            le=4096,
+            description="The minimum width during inference",
+        ),
+        width_opt: int = Input(
+            default=1024,
+            ge=256,
+            le=4096,
+            description="The optimal width during inference",
+        ),
+        width_max: int = Input(
+            default=1536,
+            ge=256,
+            le=4096,
+            description="The maximum width during inference",
+        ),
+        context_min: int = Input(
+            default=1,
+            ge=1,
+            le=128,
+            description="The minimum context during inference",
+        ),
+        context_opt: int = Input(
+            default=1,
+            ge=1,
+            le=128,
+            description="The optimal context during inference",
+        ),
+        context_max: int = Input(
+            default=1,
+            ge=1,
+            le=128,
+            description="The maximum context during inference",
+        ),
     ) -> List[Path]:
         """Run a single prediction on the model"""
         self.comfyUI.cleanup(ALL_DIRECTORIES)
-
-        # Make sure to set the seeds in your workflow
-        seed = seed_helper.generate(seed)
-
-        if image:
-            image_filename = self.filename_with_extension(image, "image")
-            self.handle_input_file(image_filename)
 
         with open(api_json_file, "r") as file:
             workflow = json.loads(file.read())
 
         self.update_workflow(
             workflow,
-            prompt=prompt,
-            negative_prompt=negative_prompt,
-            image_filename=image_filename,
-            seed=seed,
+            checkpoint=checkpoint,
+            batch_size_min=batch_size_min,
+            batch_size_opt=batch_size_opt,
+            batch_size_max=batch_size_max,
+            height_min=height_min,
+            height_opt=height_opt,
+            height_max=height_max,
+            width_min=width_min,
+            width_opt=width_opt,
+            width_max=width_max,
+            context_min=context_min,
+            context_opt=context_opt,
+            context_max=context_max,
         )
 
         wf = self.comfyUI.load_workflow(workflow)
         self.comfyUI.connect()
         self.comfyUI.run_workflow(wf)
 
-        return optimise_images.optimise_image_files(
-            output_format, output_quality, self.comfyUI.get_files(OUTPUT_DIR)
-        )
+        return self.comfyUI.get_files(OUTPUT_DIR)
