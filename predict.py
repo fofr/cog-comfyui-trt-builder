@@ -1,5 +1,6 @@
 import json
 import os
+import tarfile
 from typing import List
 from cog import BasePredictor, Input, Path
 from comfyui import ComfyUI
@@ -17,12 +18,12 @@ class Predictor(BasePredictor):
         self.comfyUI = ComfyUI("127.0.0.1:8188")
         self.comfyUI.start_server(OUTPUT_DIR, INPUT_DIR)
 
-    # Update nodes in the JSON workflow to modify your workflow based on the given inputs
+    def as_multiple_of_8(self, value):
+        return value if value % 8 == 0 else value + 8 - (value % 8)
+
     def update_workflow(self, workflow, **kwargs):
         checkpoint_loader = workflow["4"]["inputs"]
         checkpoint_loader["ckpt_name"] = kwargs["checkpoint"]
-
-        # Get checkpoint filename without extension
         checkpoint_filename = os.path.splitext(kwargs["checkpoint"])[0]
 
         builder = workflow["3"]["inputs"]
@@ -30,12 +31,12 @@ class Predictor(BasePredictor):
         builder["batch_size_min"] = kwargs["batch_size_min"]
         builder["batch_size_opt"] = kwargs["batch_size_opt"]
         builder["batch_size_max"] = kwargs["batch_size_max"]
-        builder["height_min"] = kwargs["height_min"]
-        builder["height_opt"] = kwargs["height_opt"]
-        builder["height_max"] = kwargs["height_max"]
-        builder["width_min"] = kwargs["width_min"]
-        builder["width_opt"] = kwargs["width_opt"]
-        builder["width_max"] = kwargs["width_max"]
+        builder["height_min"] = self.as_multiple_of_8(kwargs["height_min"])
+        builder["height_opt"] = self.as_multiple_of_8(kwargs["height_opt"])
+        builder["height_max"] = self.as_multiple_of_8(kwargs["height_max"])
+        builder["width_min"] = self.as_multiple_of_8(kwargs["width_min"])
+        builder["width_opt"] = self.as_multiple_of_8(kwargs["width_opt"])
+        builder["width_max"] = self.as_multiple_of_8(kwargs["width_max"])
         builder["context_min"] = kwargs["context_min"]
         builder["context_opt"] = kwargs["context_opt"]
         builder["context_max"] = kwargs["context_max"]
@@ -44,7 +45,7 @@ class Predictor(BasePredictor):
     def predict(
         self,
         checkpoint: str = Input(
-            default="",
+            default="sd3_medium.safetensors",
             description="The checkpoint to use (must be in https://github.com/fofr/cog-comfyui/blob/main/weights.json)",
         ),
         batch_size_min: int = Input(
@@ -147,4 +148,11 @@ class Predictor(BasePredictor):
         self.comfyUI.connect()
         self.comfyUI.run_workflow(wf)
 
-        return self.comfyUI.get_files(OUTPUT_DIR)
+        output_tar = os.path.join(OUTPUT_DIR, "output.tar")
+        with tarfile.open(output_tar, "w") as tar:
+            for file in os.listdir(OUTPUT_DIR):
+                file_path = os.path.join(OUTPUT_DIR, file)
+                if os.path.isfile(file_path):
+                    tar.add(file_path, arcname=file)
+
+        return [Path(output_tar)]
