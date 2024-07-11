@@ -22,7 +22,7 @@ class Predictor(BasePredictor):
         return value if value % 8 == 0 else value + 8 - (value % 8)
 
     def update_workflow(self, workflow, **kwargs):
-        checkpoint_loader = workflow["4"]["inputs"]
+        checkpoint_loader = workflow["1"]["inputs"]
         checkpoint_loader["ckpt_name"] = kwargs["checkpoint"]
         checkpoint_filename = os.path.splitext(kwargs["checkpoint"])[0]
 
@@ -152,7 +152,7 @@ class Predictor(BasePredictor):
         with tarfile.open(output_tar, "w") as tar:
             for file in os.listdir(OUTPUT_DIR):
                 file_path = os.path.join(OUTPUT_DIR, file)
-                if os.path.isfile(file_path):
+                if os.path.isfile(file_path) and file.endswith('.engine'):
                     tar.add(file_path, arcname=file)
 
         return [Path(output_tar)]
