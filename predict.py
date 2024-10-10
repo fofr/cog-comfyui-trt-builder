@@ -1,10 +1,11 @@
 import json
 import os
 import tarfile
+import math
 from typing import List
 from cog import BasePredictor, Input, Path, Secret
 from comfyui import ComfyUI
-from huggingface_hub import HfApi
+# from huggingface_hub import HfApi
 
 OUTPUT_DIR = "/tmp/outputs"
 INPUT_DIR = "/tmp/inputs"
@@ -19,13 +20,13 @@ class Predictor(BasePredictor):
         self.comfyUI = ComfyUI("127.0.0.1:8188")
         self.comfyUI.start_server(OUTPUT_DIR, INPUT_DIR)
 
-        print("Server started")
-        gpu_name = (
-            os.popen("nvidia-smi --query-gpu=name --format=csv,noheader,nounits")
-            .read()
-            .strip()
-        )
-        print(f"GPU: {gpu_name}")
+        # print("Server started")
+        # gpu_name = (
+        #     os.popen("nvidia-smi --query-gpu=name --format=csv,noheader,nounits")
+        #     .read()
+        #     .strip()
+        # )
+        # print(f"GPU: {gpu_name}")
 
     def as_multiple_of_8(self, value):
         return value if value % 8 == 0 else value + 8 - (value % 8)
@@ -166,21 +167,27 @@ class Predictor(BasePredictor):
         self.comfyUI.run_workflow(wf)
 
         output_tar = os.path.join(OUTPUT_DIR, "output.tar")
+
         with tarfile.open(output_tar, "w") as tar:
             for file in os.listdir(OUTPUT_DIR):
                 file_path = os.path.join(OUTPUT_DIR, file)
                 if os.path.isfile(file_path) and file.endswith(".engine"):
                     tar.add(file_path, arcname=file)
 
-        # Backup method - upload files to HuggingFace
-        if huggingface_token and huggingface_repo:
-            api = HfApi()
-            api.upload_file(
-                repo_id=huggingface_repo,
-                path_in_repo="output.tar",
-                path_or_fileobj=output_tar,
-                repo_type="model",
-                use_auth_token=huggingface_token.get_secret_value(),
-            )
+        # Split the tar file into 500MB chunks
+        chunk_size = 500 * 1024 * 1024  # 500MB in bytes
+        file_size = os.path.getsize(output_tar)
+        num_chunks = math.ceil(file_size / chunk_size)
 
-        return [Path(output_tar)]
+        chunk_files = []
+        with open(output_tar, 'rb') as f:
+            for i in range(num_chunks):
+                chunk_name = f"{output_tar}.part{i+1}.tar"
+                with open(chunk_name, 'wb') as chunk:
+                    chunk.write(f.read(chunk_size))
+                chunk_files.append(Path(chunk_name))
+
+        # Remove the original tar file
+        # os.remove(output_tar)
+
+        return chunk_files

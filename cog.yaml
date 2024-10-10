@@ -28,7 +28,7 @@ build:
     - tensorrt-cu12_libs>=10.1.0
 
     # upload engine
-    - huggingface_hub
+    # - huggingface_hub
 
     # fix for pydantic issues in cog
     # https://github.com/replicate/cog/issues/1623
@@ -36,4 +36,5 @@ build:
   run:
     - curl -o /usr/local/bin/pget -L "https://github.com/replicate/pget/releases/download/v0.8.1/pget_linux_x86_64" && chmod +x /usr/local/bin/pget
     - pip install onnxruntime-gpu --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/
+    # - pip install huggingface_hub
 predict: "predict.py:Predictor"
