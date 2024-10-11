@@ -1,13 +1,4 @@
 {
-  "1": {
-    "inputs": {
-      "ckpt_name": ""
-    },
-    "class_type": "CheckpointLoaderSimple",
-    "_meta": {
-      "title": "Load Checkpoint"
-    }
-  },
   "3": {
     "inputs": {
       "filename_prefix": "tensorrt/weights_name_DYN",
@@ -25,13 +16,23 @@
       "context_max": 1,
       "num_video_frames": 14,
       "model": [
-        "1",
+        "4",
         0
       ]
     },
     "class_type": "DYNAMIC_TRT_MODEL_CONVERSION",
     "_meta": {
       "title": "DYNAMIC TRT_MODEL CONVERSION"
+    }
+  },
+  "4": {
+    "inputs": {
+      "unet_name": "",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
     }
   }
 }

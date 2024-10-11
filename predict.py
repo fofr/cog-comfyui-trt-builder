@@ -32,8 +32,8 @@ class Predictor(BasePredictor):
         return value if value % 8 == 0 else value + 8 - (value % 8)
 
     def update_workflow(self, workflow, **kwargs):
-        checkpoint_loader = workflow["1"]["inputs"]
-        checkpoint_loader["ckpt_name"] = kwargs["checkpoint"]
+        unet_loader = workflow["4"]["inputs"]
+        unet_loader["unet_name"] = kwargs["checkpoint"]
 
         checkpoint_filename = os.path.splitext(kwargs["checkpoint"])[0]
 
@@ -55,7 +55,7 @@ class Predictor(BasePredictor):
     def predict(
         self,
         checkpoint: str = Input(
-            default="sd3_medium.safetensors",
+            default="flux1-dev.safetensors",
             description="The checkpoint to use (must be in https://github.com/fofr/cog-comfyui/blob/main/weights.json)",
         ),
         batch_size_min: int = Input(
