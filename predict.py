@@ -136,7 +136,7 @@ class Predictor(BasePredictor):
 
         if checkpoint.startswith("http"):
             local_checkpoint = os.path.join(
-                "ComfyUI", "models", "diffusion_models", os.path.basename(checkpoint)
+                "ComfyUI", "models", "checkpoints", os.path.basename(checkpoint)
             )
             if not os.path.exists(local_checkpoint):
                 print(f"Downloading checkpoint from {checkpoint}")
