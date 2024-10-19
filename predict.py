@@ -2,10 +2,10 @@ import json
 import os
 import tarfile
 import math
+import subprocess
 from typing import List
-from cog import BasePredictor, Input, Path, Secret
+from cog import BasePredictor, Input, Path
 from comfyui import ComfyUI
-# from huggingface_hub import HfApi
 
 OUTPUT_DIR = "/tmp/outputs"
 INPUT_DIR = "/tmp/inputs"
@@ -130,17 +130,22 @@ class Predictor(BasePredictor):
             le=128,
             description="The maximum context during inference",
         ),
-        huggingface_token: Secret = Input(
-            description="Optional: Your HuggingFace token",
-            default=None,
-        ),
-        huggingface_repo: str = Input(
-            description="Optional: The HuggingFace repo to upload the engine to",
-            default=None,
-        ),
     ) -> List[Path]:
         """Run a single prediction on the model"""
         self.comfyUI.cleanup(ALL_DIRECTORIES)
+
+        if checkpoint.startswith("http"):
+            local_checkpoint = os.path.join(
+                "ComfyUI", "models", "diffusion_models", os.path.basename(checkpoint)
+            )
+            if not os.path.exists(local_checkpoint):
+                print(f"Downloading checkpoint from {checkpoint}")
+                print(f"Local checkpoint path: {local_checkpoint}")
+                subprocess.run(["pget", checkpoint, local_checkpoint], check=True)
+                print(f"Downloaded checkpoint to {os.path.basename(local_checkpoint)}")
+            else:
+                print(f"Checkpoint already exists at {local_checkpoint}")
+            checkpoint = os.path.basename(local_checkpoint)
 
         with open(api_json_file, "r") as file:
             workflow = json.loads(file.read())
@@ -180,10 +185,10 @@ class Predictor(BasePredictor):
         num_chunks = math.ceil(file_size / chunk_size)
 
         chunk_files = []
-        with open(output_tar, 'rb') as f:
+        with open(output_tar, "rb") as f:
             for i in range(num_chunks):
                 chunk_name = f"{output_tar}.part{i+1}.tar"
-                with open(chunk_name, 'wb') as chunk:
+                with open(chunk_name, "wb") as chunk:
                     chunk.write(f.read(chunk_size))
                 chunk_files.append(Path(chunk_name))
 
