@@ -2,9 +2,11 @@ import json
 import os
 import tarfile
 import math
+import subprocess
 from typing import List
 from cog import BasePredictor, Input, Path, Secret
 from comfyui import ComfyUI
+
 # from huggingface_hub import HfApi
 
 OUTPUT_DIR = "/tmp/outputs"
@@ -34,8 +36,11 @@ class Predictor(BasePredictor):
     def update_workflow(self, workflow, **kwargs):
         unet_loader = workflow["4"]["inputs"]
         unet_loader["unet_name"] = kwargs["checkpoint"]
+        unet_loader["weight_dtype"] = kwargs["weight_dtype"]
 
-        checkpoint_filename = os.path.splitext(kwargs["checkpoint"])[0]
+        checkpoint_filename = os.path.splitext(os.path.basename(kwargs["checkpoint"]))[
+            0
+        ]
 
         builder = workflow["3"]["inputs"]
         builder["filename_prefix"] = f"{checkpoint_filename}_DYN"
@@ -56,7 +61,12 @@ class Predictor(BasePredictor):
         self,
         checkpoint: str = Input(
             default="flux1-dev.safetensors",
-            description="The checkpoint to use (must be in https://github.com/fofr/cog-comfyui/blob/main/weights.json)",
+            description="The checkpoint to use. Can be a local file or a HuggingFace URL.",
+        ),
+        weight_dtype: str = Input(
+            default="default",
+            choices=["default", "fp8_e4m3fn", "fp8_e4m3fn_fast", "fp8_e5m2"],
+            description="The weight dtype to use. Leave as default if unknown.",
         ),
         batch_size_min: int = Input(
             default=1,
@@ -130,17 +140,22 @@ class Predictor(BasePredictor):
             le=128,
             description="The maximum context during inference",
         ),
-        huggingface_token: Secret = Input(
-            description="Optional: Your HuggingFace token",
-            default=None,
-        ),
-        huggingface_repo: str = Input(
-            description="Optional: The HuggingFace repo to upload the engine to",
-            default=None,
-        ),
     ) -> List[Path]:
         """Run a single prediction on the model"""
         self.comfyUI.cleanup(ALL_DIRECTORIES)
+
+        if checkpoint.startswith("http"):
+            local_checkpoint = os.path.join(
+                "ComfyUI", "models", "diffusion_models", os.path.basename(checkpoint)
+            )
+            if not os.path.exists(local_checkpoint):
+                print(f"Downloading checkpoint from {checkpoint}")
+                print(f"Local checkpoint path: {local_checkpoint}")
+                subprocess.run(["pget", checkpoint, local_checkpoint], check=True)
+                print(f"Downloaded checkpoint to {os.path.basename(local_checkpoint)}")
+            else:
+                print(f"Checkpoint already exists at {local_checkpoint}")
+            checkpoint = os.path.basename(local_checkpoint)
 
         with open(api_json_file, "r") as file:
             workflow = json.loads(file.read())
@@ -148,6 +163,7 @@ class Predictor(BasePredictor):
         self.update_workflow(
             workflow,
             checkpoint=checkpoint,
+            weight_dtype=weight_dtype,
             batch_size_min=batch_size_min,
             batch_size_opt=batch_size_opt,
             batch_size_max=batch_size_max,
@@ -161,6 +177,8 @@ class Predictor(BasePredictor):
             context_opt=context_opt,
             context_max=context_max,
         )
+
+        print(f"Loaded workflow: {workflow}")
 
         wf = self.comfyUI.load_workflow(workflow)
         self.comfyUI.connect()
@@ -180,10 +198,10 @@ class Predictor(BasePredictor):
         num_chunks = math.ceil(file_size / chunk_size)
 
         chunk_files = []
-        with open(output_tar, 'rb') as f:
+        with open(output_tar, "rb") as f:
             for i in range(num_chunks):
                 chunk_name = f"{output_tar}.part{i+1}.tar"
-                with open(chunk_name, 'wb') as chunk:
+                with open(chunk_name, "wb") as chunk:
                     chunk.write(f.read(chunk_size))
                 chunk_files.append(Path(chunk_name))
 
